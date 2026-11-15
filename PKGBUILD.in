@@ -13,13 +13,13 @@ sha256sums=('@SHA256@')
 options=('!lto')
 
 build() {
-  cd "$pkgname-$pkgver"
+  cd "animecix-linux-$pkgver"
   export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$srcdir/target}"
   cargo build --release --locked
 }
 
 package() {
-  cd "$pkgname-$pkgver"
+  cd "animecix-linux-$pkgver"
   install -Dm755 "${CARGO_TARGET_DIR:-$srcdir/target}/release/animecix" "$pkgdir/usr/bin/animecix"
   install -Dm644 packaging/flatpak/io.github.veilzon.AnimeciX.metainfo.xml \
     "$pkgdir/usr/share/metainfo/io.github.veilzon.AnimeciX.metainfo.xml"
