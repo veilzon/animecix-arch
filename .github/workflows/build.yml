@@ -139,7 +139,7 @@ jobs:
           pacman-key --populate archlinux
           su builder -c "gpg --armor --export '$KEYID'" > /tmp/pub.asc
           pacman-key --add /tmp/pub.asc
-          yes | pacman-key --lsign-key "$KEYID"
+          yes | pacman-key --lsign-key "$KEYID" || true
           pacman -U --noconfirm "$PKG"
           desktop-file-validate /usr/share/applications/tr.com.animecix.desktop
           xvfb-run -a animecix --check-icons
