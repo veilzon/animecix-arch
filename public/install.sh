@@ -72,7 +72,10 @@ GOT_FPR=$(gpg --show-keys --with-colons "$KEY_FILE" 2>/dev/null \
 info "Anahtar pacman keyring'e ekleniyor..."
 as_root pacman-key --add "$KEY_FILE" >/dev/null
 if [ "$ASSUME_YES" -eq 1 ]; then
-    yes | as_root pacman-key --lsign-key "$KEY_ID" >/dev/null || true
+    # `yes` pacman-key çıkınca SIGPIPE alır; asıl komutun durumunu koru.
+    set +o pipefail
+    yes | as_root pacman-key --lsign-key "$KEY_ID"
+    set -o pipefail
 else
     as_root pacman-key --lsign-key "$KEY_ID"
 fi

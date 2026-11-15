@@ -33,6 +33,8 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm --needed sudo curl gnupg \
             xorg-server-xvfb xorg-xauth desktop-file-utils
+          pacman-key --init
+          pacman-key --populate archlinux
           useradd -m tester
           echo 'tester ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/tester
           chmod 440 /etc/sudoers.d/tester
