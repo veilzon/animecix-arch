@@ -179,3 +179,17 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Installer yayında mı?
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 10); do
+            if curl -fsSL https://veilzon.github.io/animecix-arch/install.sh -o /tmp/install.sh                && diff -u public/install.sh /tmp/install.sh; then
+              echo "install.sh yayında ve güncel"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "HATA: yayındaki install.sh repo ile aynı değil"
+          exit 1
