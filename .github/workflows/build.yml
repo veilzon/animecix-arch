@@ -129,27 +129,31 @@ jobs:
       - name: Test ve namcap
         if: steps.check.outputs.skip != 'true'
         run: |
-          set +e
+          set -euo pipefail
           cd work
-          PKG=$(ls animecix-*.pkg.tar.zst | head -n1)
+          PKG=$(ls animecix-*.pkg.tar.zst | grep -v -- '-debug' | head -n1)
           echo "Paket: $PKG"
           namcap "$PKG" || true
           # Test kurulumu için imza anahtarını root'un pacman keyring'ine ekle.
+          pacman-key --init
+          pacman-key --populate archlinux
           su builder -c "gpg --armor --export '$KEYID'" > /tmp/pub.asc
           pacman-key --add /tmp/pub.asc
-          yes | pacman-key --lsign-key "$KEYID" || true
+          yes | pacman-key --lsign-key "$KEYID"
           pacman -U --noconfirm "$PKG"
-          desktop-file-validate /usr/share/applications/tr.com.animecix.desktop || true
-          xvfb-run -a animecix --check-icons || true
-          xvfb-run -a animecix --check-shaders || true
+          desktop-file-validate /usr/share/applications/tr.com.animecix.desktop
+          xvfb-run -a animecix --check-icons
+          xvfb-run -a animecix --check-shaders
 
       - name: Repo oluştur ve imzala
         if: steps.check.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          cp work/animecix-*.pkg.tar.zst public/x86_64/
+          PKG=$(ls work/animecix-*.pkg.tar.zst | grep -v -- '-debug' | head -n1)
+          PKGNAME=$(basename "$PKG")
+          cp "$PKG" "$PKG.sig" public/x86_64/
           chown -R builder:builder "$PWD/public"
-          su builder -c "cd '$PWD/public/x86_64' && repo-add --sign --key '$KEYID' animecix.db.tar.gz animecix-*.pkg.tar.zst"
+          su builder -c "cd '$PWD/public/x86_64' && repo-add --sign --key '$KEYID' animecix.db.tar.gz '$PKGNAME'"
           cd public/x86_64
           rm -f animecix.db animecix.db.sig animecix.files animecix.files.sig
           cp animecix.db.tar.gz animecix.db

@@ -10,7 +10,7 @@ depends=('gtk4' 'libadwaita' 'mpv' 'aria2')
 makedepends=('rust' 'cargo' 'git' 'cmake' 'clang' 'perl' 'nasm' 'zlib' 'pkgconf')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/veilzon/animecix-linux/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('@SHA256@')
-options=('!lto')
+options=('!lto' '!debug')
 
 build() {
   cd "animecix-linux-$pkgver"
