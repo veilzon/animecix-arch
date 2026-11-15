@@ -1,0 +1,177 @@
+name: Arch paket repo
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "AnimeciX tag (boşsa son release)"
+        required: false
+        default: ""
+      force:
+        description: "Aynı sürümü yeniden derle"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: arch-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+      options: --user root
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 90
+    steps:
+      - name: Araçları kur
+        run: |
+          set -euo pipefail
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed \
+            base-devel git curl jq gtk4 libadwaita mpv aria2 \
+            cmake clang perl nasm zlib pkgconf rust cargo gnupg \
+            namcap desktop-file-utils xorg-server-xvfb xorg-xauth
+          useradd -m builder 2>/dev/null || true
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+
+      - name: Tag çöz
+        id: tag
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(curl -fsSL https://api.github.com/repos/veilzon/animecix-linux/releases/latest | jq -r .tag_name)
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "ver=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Sürüm: $TAG"
+
+      - name: Aynı sürüm yayında mı?
+        id: check
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Zorla yeniden derleme"
+            exit 0
+          fi
+          CURRENT=$(curl -fsSL https://veilzon.github.io/animecix-arch/version.txt 2>/dev/null || true)
+          if [ "$CURRENT" = "${{ steps.tag.outputs.tag }}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Bu sürüm zaten yayında: $CURRENT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Cargo cache
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/builder/.cargo/registry
+            /home/builder/.cargo/git
+            target
+          key: arch-cargo-${{ steps.tag.outputs.ver }}-${{ hashFiles('PKGBUILD.in') }}
+          restore-keys: |
+            arch-cargo-
+
+      - name: PKGBUILD hazırla
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          VER="${{ steps.tag.outputs.ver }}"
+          mkdir -p work/cache public/x86_64
+          URL="https://github.com/veilzon/animecix-linux/archive/refs/tags/v$VER.tar.gz"
+          curl -fsSL "$URL" -o "work/cache/animecix-$VER.tar.gz"
+          SHA=$(sha256sum "work/cache/animecix-$VER.tar.gz" | awk '{print $1}')
+          sed -e "s/@PKGVER@/$VER/g" -e "s/@SHA256@/$SHA/g" PKGBUILD.in > work/PKGBUILD
+          echo "kaynak sha256: $SHA"
+          chown -R builder:builder "$PWD"
+
+      - name: GPG anahtarını yükle
+        if: steps.check.outputs.skip != 'true'
+        env:
+          PACMAN_GPG_PRIVATE_KEY: ${{ secrets.PACMAN_GPG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PACMAN_GPG_PRIVATE_KEY" > /tmp/pacman-key.asc
+          install -m600 -o builder -g builder /tmp/pacman-key.asc /home/builder/pacman-key.asc
+          install -d -m700 -o builder -g builder /home/builder/.gnupg
+          su builder -c 'gpg --batch --import /home/builder/pacman-key.asc && rm /home/builder/pacman-key.asc'
+          FPR=$(su builder -c 'gpg --with-colons --list-keys' | awk -F: '/^fpr:/ {print $10; exit}')
+          KEYID=${FPR: -16}
+          echo "KEYID=$KEYID" >> "$GITHUB_ENV"
+          echo "GPGKEY=\"$KEYID\"" >> /home/builder/.makepkg.conf
+          chown builder:builder /home/builder/.makepkg.conf
+          echo "GPG key: $FPR"
+
+      - name: Derle
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          su builder -c "cd '$PWD/work' && CARGO_TARGET_DIR='$PWD/target' SRCDEST='$PWD/work/cache' makepkg -f --noconfirm --sign"
+
+      - name: Test ve namcap
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set +e
+          cd work
+          PKG=$(ls animecix-*.pkg.tar.zst | head -n1)
+          echo "Paket: $PKG"
+          namcap "$PKG" || true
+          # Test kurulumu için imza anahtarını root'un pacman keyring'ine ekle.
+          su builder -c "gpg --armor --export '$KEYID'" > /tmp/pub.asc
+          pacman-key --add /tmp/pub.asc
+          yes | pacman-key --lsign-key "$KEYID" || true
+          pacman -U --noconfirm "$PKG"
+          desktop-file-validate /usr/share/applications/tr.com.animecix.desktop || true
+          xvfb-run -a animecix --check-icons || true
+          xvfb-run -a animecix --check-shaders || true
+
+      - name: Repo oluştur ve imzala
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          cp work/animecix-*.pkg.tar.zst public/x86_64/
+          chown -R builder:builder "$PWD/public"
+          su builder -c "cd '$PWD/public/x86_64' && repo-add --sign --key '$KEYID' animecix.db.tar.gz animecix-*.pkg.tar.zst"
+          cd public/x86_64
+          rm -f animecix.db animecix.db.sig animecix.files animecix.files.sig
+          cp animecix.db.tar.gz animecix.db
+          cp animecix.db.tar.gz.sig animecix.db.sig
+          cp animecix.files.tar.gz animecix.files
+          cp animecix.files.tar.gz.sig animecix.files.sig
+          cd "$PWD/../.."
+          su builder -c "gpg --armor --export '$KEYID' > '$PWD/public/animecix.gpg'"
+          echo "${{ steps.tag.outputs.tag }}" > public/version.txt
+          chown -R builder:builder "$PWD/public"
+
+      - name: Pages ayarla
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/configure-pages@v5
+
+      - name: Pages artifact yükle
+        if: steps.check.outputs.skip != 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Pages deploy
+        if: steps.check.outputs.skip != 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4

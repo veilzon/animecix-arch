@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>AnimeciX Arch Linux deposu</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 3rem auto; padding: 0 1rem; line-height: 1.55; }
+    code, pre { background: #f2f2f2; border-radius: 6px; padding: .15rem .35rem; }
+    pre { padding: 1rem; overflow-x: auto; }
+    h1 { margin-bottom: .3rem; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>AnimeciX Arch Linux deposu</h1>
+  <p class="muted">İmzalı pacman deposu · <span id="version">sürüm yükleniyor…</span></p>
+
+  <h2>Kurulum</h2>
+  <pre><code>curl -fsSL https://veilzon.github.io/animecix-arch/animecix.gpg \
+  | sudo pacman-key --add -
+sudo pacman-key --lsign-key 2B2361F1C5D588EF
+
+# /etc/pacman.conf
+[animecix]
+SigLevel = Required DatabaseOptional
+Server = https://veilzon.github.io/animecix-arch/$arch
+
+sudo pacman -Syu
+sudo pacman -S animecix</code></pre>
+
+  <h2>Güncelleme</h2>
+  <pre><code>sudo pacman -Syu</code></pre>
+
+  <p>Anahtar parmak izi: <code>7A08 1AF6 3552 C10A 13BB A602 2B23 61F1 C5D5 88EF</code></p>
+
+  <script>
+    fetch('version.txt').then(r => r.text()).then(v => {
+      document.getElementById('version').textContent = v.trim();
+    }).catch(() => {});
+  </script>
+</body>
+</html>
