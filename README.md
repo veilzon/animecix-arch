@@ -4,8 +4,22 @@ AnimeciX için imzalı Arch Linux pacman deposu.
 
 ## Kurulum
 
+Tek komut:
+
 ```bash
-# Depo anahtarını ekle
+curl -fsSL https://veilzon.github.io/animecix-arch/install.sh -o /tmp/animecix-install.sh
+sudo bash /tmp/animecix-install.sh
+```
+
+Veya doğrudan:
+
+```bash
+curl -fsSL https://veilzon.github.io/animecix-arch/install.sh | sudo bash
+```
+
+Manuel kurulum:
+
+```bash
 curl -fsSL https://veilzon.github.io/animecix-arch/animecix.gpg -o /tmp/animecix.gpg
 sudo pacman-key --add /tmp/animecix.gpg
 sudo pacman-key --lsign-key 2B2361F1C5D588EF
@@ -15,7 +29,6 @@ sudo pacman-key --lsign-key 2B2361F1C5D588EF
 SigLevel = Required DatabaseOptional
 Server = https://veilzon.github.io/animecix-arch/$arch
 
-# Kur
 sudo pacman -Syu
 sudo pacman -S animecix
 ```

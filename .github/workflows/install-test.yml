@@ -1,0 +1,59 @@
+name: Kurulum betiği testi
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - public/install.sh
+      - .github/workflows/install-test.yml
+  schedule:
+    - cron: "30 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-test
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    container:
+      image: archlinux:latest
+      options: --user root
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test araçları ve kullanıcı
+        run: |
+          set -euo pipefail
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed sudo curl gnupg \
+            xorg-server-xvfb xorg-xauth desktop-file-utils
+          useradd -m tester
+          echo 'tester ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/tester
+          chmod 440 /etc/sudoers.d/tester
+          chown -R tester:tester "$GITHUB_WORKSPACE"
+
+      - name: Kurulum betiğini root olmayan kullanıcıyla çalıştır
+        run: |
+          set -euo pipefail
+          su tester -c "cd '$GITHUB_WORKSPACE' && bash public/install.sh --yes"
+
+      - name: Kurulumu doğrula
+        run: |
+          set -euo pipefail
+          pacman -Q animecix
+          grep -q '^\[animecix\]' /etc/pacman.conf
+          desktop-file-validate /usr/share/applications/tr.com.animecix.desktop
+          xvfb-run -a animecix --check-icons
+          xvfb-run -a animecix --check-shaders
+
+      - name: Idempotency (ikinci çalıştırma)
+        run: |
+          set -euo pipefail
+          su tester -c "cd '$GITHUB_WORKSPACE' && bash public/install.sh --yes"
+          test "$(grep -c '^\[animecix\]' /etc/pacman.conf)" = "1"
