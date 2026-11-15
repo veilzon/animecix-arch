@@ -16,8 +16,8 @@
   <p class="muted">İmzalı pacman deposu · <span id="version">sürüm yükleniyor…</span></p>
 
   <h2>Kurulum</h2>
-  <pre><code>curl -fsSL https://veilzon.github.io/animecix-arch/animecix.gpg \
-  | sudo pacman-key --add -
+  <pre><code>curl -fsSL https://veilzon.github.io/animecix-arch/animecix.gpg -o /tmp/animecix.gpg
+sudo pacman-key --add /tmp/animecix.gpg
 sudo pacman-key --lsign-key 2B2361F1C5D588EF
 
 # /etc/pacman.conf
