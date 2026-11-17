@@ -1,25 +1,25 @@
 # Maintainer: veilzon <veilzon@users.noreply.github.com>
 pkgname=animecix
 pkgver=@PKGVER@
-pkgrel=1
+pkgrel=@PKGREL@
 pkgdesc="Türkçe anime izleme uygulaması (GTK4/libadwaita + mpv)"
 arch=('x86_64')
 url="https://github.com/veilzon/animecix-linux"
 license=('MIT')
 depends=('gtk4' 'libadwaita' 'mpv' 'aria2')
 makedepends=('rust' 'cargo' 'git' 'cmake' 'clang' 'perl' 'nasm' 'zlib' 'pkgconf')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/veilzon/animecix-linux/archive/refs/tags/v$pkgver.tar.gz")
+source=("$pkgname-@SRC_FILE@.tar.gz::@SRC_URL@")
 sha256sums=('@SHA256@')
 options=('!lto' '!debug')
 
 build() {
-  cd "animecix-linux-$pkgver"
+  cd "animecix-linux-@SRC_DIR@"
   export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$srcdir/target}"
   cargo build --release --locked
 }
 
 package() {
-  cd "animecix-linux-$pkgver"
+  cd "animecix-linux-@SRC_DIR@"
   install -Dm755 "${CARGO_TARGET_DIR:-$srcdir/target}/release/animecix" "$pkgdir/usr/bin/animecix"
   install -Dm644 packaging/flatpak/io.github.veilzon.AnimeciX.metainfo.xml \
     "$pkgdir/usr/share/metainfo/io.github.veilzon.AnimeciX.metainfo.xml"

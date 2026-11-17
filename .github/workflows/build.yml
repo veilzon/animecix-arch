@@ -13,6 +13,14 @@ on:
         description: "Aynı sürümü yeniden derle"
         type: boolean
         default: false
+      source_ref:
+        description: "Kaynak ref (boşsa tag; örn. main)"
+        required: false
+        default: ""
+      pkgrel:
+        description: "pkgrel (boşsa tag=1, main=2)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -57,7 +65,10 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "ver=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "Sürüm: $TAG"
+          REF="${{ inputs.source_ref }}"
+          [ -n "$REF" ] || REF="$TAG"
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Sürüm: $TAG (kaynak: $REF)"
 
       - name: Aynı sürüm yayında mı?
         id: check
@@ -97,12 +108,26 @@ jobs:
         run: |
           set -euo pipefail
           VER="${{ steps.tag.outputs.ver }}"
+          REF="${{ steps.tag.outputs.ref }}"
+          if [ "$REF" = "main" ]; then
+            SRC_URL="https://github.com/veilzon/animecix-linux/archive/refs/heads/main.tar.gz"
+            SRC_DIR="main"
+            DEF_PKGREL=2
+          else
+            SRC_URL="https://github.com/veilzon/animecix-linux/archive/refs/tags/$REF.tar.gz"
+            SRC_DIR="${REF#v}"
+            DEF_PKGREL=1
+          fi
+          PKGREL="${{ inputs.pkgrel }}"
+          [ -n "$PKGREL" ] || PKGREL="$DEF_PKGREL"
           mkdir -p work/cache public/x86_64
-          URL="https://github.com/veilzon/animecix-linux/archive/refs/tags/v$VER.tar.gz"
-          curl -fsSL "$URL" -o "work/cache/animecix-$VER.tar.gz"
-          SHA=$(sha256sum "work/cache/animecix-$VER.tar.gz" | awk '{print $1}')
-          sed -e "s/@PKGVER@/$VER/g" -e "s/@SHA256@/$SHA/g" PKGBUILD.in > work/PKGBUILD
-          echo "kaynak sha256: $SHA"
+          curl -fsSL "$SRC_URL" -o "work/cache/animecix-$REF.tar.gz"
+          SHA=$(sha256sum "work/cache/animecix-$REF.tar.gz" | awk '{print $1}')
+          sed -e "s/@PKGVER@/$VER/g" -e "s/@PKGREL@/$PKGREL/g" \
+              -e "s#@SRC_URL@#$SRC_URL#g" -e "s/@SRC_DIR@/$SRC_DIR/g" \
+              -e "s/@SRC_FILE@/$REF/g" -e "s/@SHA256@/$SHA/g" \
+              PKGBUILD.in > work/PKGBUILD
+          echo "kaynak: $REF, pkgrel: $PKGREL, sha256: $SHA"
           chown -R builder:builder "$PWD"
 
       - name: GPG anahtarını yükle
@@ -146,6 +171,8 @@ jobs:
           desktop-file-validate /usr/share/applications/tr.com.animecix.desktop
           xvfb-run -a animecix --check-icons
           xvfb-run -a animecix --check-shaders
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 animecix --player-smoke \
+            /usr/share/animecix/assets/changelog/ekrangoruntusu.mp4
 
       - name: Repo oluştur ve imzala
         if: steps.check.outputs.skip != 'true'
