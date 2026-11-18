@@ -127,6 +127,7 @@ jobs:
               -e "s#@SRC_URL@#$SRC_URL#g" -e "s/@SRC_DIR@/$SRC_DIR/g" \
               -e "s/@SRC_FILE@/$REF/g" -e "s/@SHA256@/$SHA/g" \
               PKGBUILD.in > work/PKGBUILD
+          cp animecix.install work/
           echo "kaynak: $REF, pkgrel: $PKGREL, sha256: $SHA"
           chown -R builder:builder "$PWD"
 
@@ -168,6 +169,8 @@ jobs:
           pacman-key --add /tmp/pub.asc
           yes | pacman-key --lsign-key "$KEYID" || true
           pacman -U --noconfirm "$PKG"
+          test -x /usr/bin/animecix-calendar
+          ! ldd /usr/bin/animecix-calendar | grep -Eq 'libgtk|libadwaita'
           desktop-file-validate /usr/share/applications/tr.com.animecix.desktop
           xvfb-run -a animecix --check-icons
           xvfb-run -a animecix --check-shaders

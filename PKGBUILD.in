@@ -11,6 +11,7 @@ makedepends=('rust' 'cargo' 'git' 'cmake' 'clang' 'perl' 'nasm' 'zlib' 'pkgconf'
 source=("$pkgname-@SRC_FILE@.tar.gz::@SRC_URL@")
 sha256sums=('@SHA256@')
 options=('!lto' '!debug')
+install=animecix.install
 
 build() {
   cd "animecix-linux-@SRC_DIR@"
@@ -21,6 +22,7 @@ build() {
 package() {
   cd "animecix-linux-@SRC_DIR@"
   install -Dm755 "${CARGO_TARGET_DIR:-$srcdir/target}/release/animecix" "$pkgdir/usr/bin/animecix"
+  install -Dm755 "${CARGO_TARGET_DIR:-$srcdir/target}/release/animecix-calendar" "$pkgdir/usr/bin/animecix-calendar"
   install -Dm644 packaging/flatpak/io.github.veilzon.AnimeciX.metainfo.xml \
     "$pkgdir/usr/share/metainfo/io.github.veilzon.AnimeciX.metainfo.xml"
 
